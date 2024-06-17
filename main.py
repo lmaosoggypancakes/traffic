@@ -8,6 +8,8 @@ so it basically speeds up then slows down at a logistic rate.
 - TODO: handle collisions of cars/slowing down to avoid collisions
 """
 import pygame
+import pygame_widgets
+from pygame_widgets.slider import Slider
 from traffic import *
 ARROW_SIZE = 10
 NUM_CARS = 512
@@ -34,24 +36,37 @@ pygame.font.init()
 font_norm = pygame.font.SysFont("Noto Sans", 11)
 font_xl = pygame.font.SysFont("Noto Sans", 24)
 screen = pygame.display.set_mode(m.get_window_dimensions())
+
 clock = pygame.time.Clock()
+slider = Slider(screen, 200,400+100*SIDES,100*SIDES+100,50, min=0.1,max=2, handleColour=(255,0,0), step=0.1, colour=(100,100,100), handleRadius=20, initial=1)
 running = True
 cars_enabled = True
+num_cars = NUM_CARS
+vel_factor = 1
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         if event.type == pygame.KEYDOWN:
-            print(pygame.K_SPACE)
             if event.key == pygame.K_SPACE:
                 cars_enabled = not cars_enabled
+            if event.key == pygame.K_c:
+                num_cars+=1
+                c = Car(m, random.randrange(0, m.city.num_nodes))
+                c.choose_random_road()
+                cf.add(c)
 
     screen.fill("black")
     title = font_xl.render("traffic simulation", False, (255,255,255))
-    screen.blit(title, (screen.get_size()[0]/2-75, 30))
+    title_rect = title.get_rect(center=(screen.get_size()[0]/2, 30))
+    screen.blit(title, title_rect)
 
-    title = font_xl.render(f"cars={NUM_CARS}, roads={2 ** SIDES}", False, (255,255,255))
-    screen.blit(title, (screen.get_size()[0]/2-100, 70))
+    cars_text = font_xl.render(f"cars={num_cars}, roads={2 ** SIDES}", False, (255,255,255))
+    cars_text_rect = title.get_rect(center=(screen.get_size()[0]/2, 70))
+    screen.blit(cars_text, cars_text_rect)
+
+    keybinds = font_xl.render(f"SPACE - pause, C - add car", False, (255,255,255))
+    screen.blit(keybinds, (200, 120))
     # draw roads
     connections = m.get_connections()
     for (i, j) in connections:
@@ -86,7 +101,10 @@ while running:
         # if len(car.get_frontier()) != 0 and cars_enabled:
             # car.go()
     if cars_enabled:
-        cf.make_cars_go()
+        cf.make_cars_go(vel_factor=vel_factor)
+
+    pygame_widgets.update(pygame.event.get())
+    vel_factor = slider.getValue()
     pygame.display.flip()
     clock.tick(60)
 

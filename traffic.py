@@ -4,7 +4,7 @@ import uuid
 from typing import List
 # 60 fps, 5 pts/frame = 120 pts/s
 MAX_VEL = 5
-
+P = 0.3 # chance for any (i,j) connection to exist
 class City:
     def __init__(self, num_nodes):
         self.num_nodes = num_nodes
@@ -30,7 +30,7 @@ class City:
     def randomize_connections(self):
         for i in range(self.num_nodes):
             for j in range(self.num_nodes):
-                if random.choice([True, False]) and i != j:
+                if random.random() < P and i != j:
                     # diagonals
                     if abs(self.row_of(i) - self.row_of(j)) == 1 and abs(self.col_of(i) - self.col_of(j)) == 1: 
                         self.connect(i,j) 
@@ -89,6 +89,12 @@ class Car:
         self.vel = 0
         self.pos = m.coord_of(start)
         self.line_along = None
+        # TODO: handle lanes, that is:
+        # - allow a car to go between (i,j) on lane i for any i in [0, n] (make this fixed for now)
+        # - allow a car to switch from lane i to lane (i-1, i+1), respecting the domain of i
+        # - require that all cars must be in the rightmost (or leftmost) k lanes in order to turn, and vice versa to go straight
+        # - handle velocity control for cars in different lanes, including cars that want to change lanes (i.e. create a set of parameters at which they *can* turn, like proximity of other cars, distance to intersection, etc and determine which car(s) should slow down/speed up)
+        # - detect *any* car crashes, in an optimal time efficiency (like not O(n), ideally constant time)
         if 0 > start or m.city.num_nodes <= start:
             raise Exception("invalid starting point")
     
@@ -159,6 +165,9 @@ class CarFactory:
         self.cars = cars
         pass
 
+    def add(self, car: Car):
+        self.cars.append(car)
+        
     def vel_for(self, car: Car):
         """
         gives the velocity a given car should go at, based on its position,
@@ -175,6 +184,7 @@ class CarFactory:
         neighbors = self.neighbors(car)
         if len(neighbors) == 0:
             return vel_naive
+        # return 0.1
         closest = min(neighbors, key=lambda k:k[0].vel)
         if closest[0].vel < vel_naive:
             return closest[0].vel
@@ -195,16 +205,16 @@ class CarFactory:
                 # travelling in the same road AND direction
                 dist = math.dist(c.pos, car.pos)
                 # are they close enough together, and is c "ahead" of car?
-                start = car.m.coord_of(car.last_point)
+                start = car.m.coord_of(car.line_along[0])
                 proximity = math.dist(start, c.pos) - math.dist(start, car.pos)
-                if 0 <= proximity <= 20:
+                if 0 < proximity <= 20:
                     res.append([c, proximity])
         return res
-    def make_cars_go(self):
+    def make_cars_go(self, vel_factor=1):
         """
         moves all cars
         """
         for car in self.cars:
-            car.go(self.vel_for(car))
+            car.go(vel_factor*self.vel_for(car))
     # TODO: handle car crashes (cars waiting at different intersections, starting at different points along
     # a path, etc)
